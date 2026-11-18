@@ -1,0 +1,11 @@
+{
+  "network": "BSC testnet (chain 97)",
+  "mockAgentId": "0x407c4d2B7F635E2cE796a71b189c31Cb59445940",
+  "agentBoard": "0x70dfca893f832D7B957681AF8aFb15ac2ACF15E1",
+  "deployer": "0x02F975f5055d8b33026079F2534b26cA4Cc89210",
+  "worker": "0x69e69A2a9fBEe8E36e1b3787F9194e54440bc2c5",
+  "timeoutTaskId": 3,
+  "timeoutClaimableAfterUTC": "2026-11-20T22:06:06Z",
+  "explorerBoard": "https://testnet.bscscan.com/address/0x70dfca893f832D7B957681AF8aFb15ac2ACF15E1",
+  "explorerMock": "https://testnet.bscscan.com/address/0x407c4d2B7F635E2cE796a71b189c31Cb59445940"
+}
