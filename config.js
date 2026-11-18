@@ -9,6 +9,6 @@ window.AGENTBOARD_CONFIG = {
   chainName: "BNB Smart Chain Testnet",
   rpcUrl: "https://data-seed-prebsc-1-s1.bnbchain.org:8545",
   explorer: "https://testnet.bscscan.com",
-  agentBoard: "0x0000000000000000000000000000000000000000", // TODO: fill after testnet deploy
-  agentId: "0x0000000000000000000000000000000000000000", // mock Agent ID on testnet
+  agentBoard: "0x70dfca893f832D7B957681AF8aFb15ac2ACF15E1", // TODO: fill after testnet deploy
+  agentId: "0x407c4d2B7F635E2cE796a71b189c31Cb59445940", // mock Agent ID on testnet
 };
