@@ -38,8 +38,32 @@
     el.textContent = (el.textContent === "—" ? "" : el.textContent + "\n") + line;
   }
 
-  function initRead() {
-    provider = new ethers.JsonRpcProvider(cfg.rpcUrl);
+  // Try each configured RPC in order; the first one that answers with the
+  // expected chainId wins. A single dead endpoint used to blank the whole
+  // task list ("Could not load tasks: Failed to fetch").
+  async function pickProvider() {
+    const urls = cfg.rpcUrls || [cfg.rpcUrl];
+    for (const url of urls) {
+      try {
+        const p = new ethers.JsonRpcProvider(url);
+        const net = await Promise.race([
+          p.getNetwork(),
+          new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 8000)),
+        ]);
+        if (Number(net.chainId) === cfg.chainId) return p;
+        log("RPC " + url + " answered chain " + net.chainId + ", expected " + cfg.chainId + " — skipping");
+      } catch (e) { log("RPC " + url + " unreachable (" + (e.message || e) + ") — trying next"); }
+    }
+    return null;
+  }
+
+  async function initRead() {
+    provider = await pickProvider();
+    if (!provider) {
+      $("tasks").innerHTML = '<span class="muted">Could not reach any BNB testnet RPC. Please try again later.</span>';
+      $("board").innerHTML = '<span class="muted">—</span>';
+      return false;
+    }
     board = new ethers.Contract(cfg.agentBoard, window.AGENTBOARD_ABI, provider);
     agentId = new ethers.Contract(cfg.agentId, window.AGENTID_ABI, provider);
     $("addrs").innerHTML =
@@ -47,6 +71,7 @@
       '" target="_blank">' + short(cfg.agentBoard) + "</a>" +
       " · Agent ID <a class=\"mono\" href=\"" + cfg.explorer + "/address/" + cfg.agentId +
       '" target="_blank">' + short(cfg.agentId) + "</a>";
+    return true;
   }
 
   async function refreshIdBadge() {
@@ -83,6 +108,29 @@
       renderTasks();
       renderBoard();
     } catch (e) {
+      // The live RPC may have died since boot — re-pick a working one and retry once.
+      try {
+        const p2 = await pickProvider();
+        if (p2) {
+          provider = p2;
+          board = new ethers.Contract(cfg.agentBoard, window.AGENTBOARD_ABI, provider);
+          agentId = new ethers.Contract(cfg.agentId, window.AGENTID_ABI, provider);
+          const n = Number(await board.taskCount());
+          const list = [];
+          for (let i = 0; i < n; i++) {
+            const t = await board.tasks(i);
+            list.push({
+              id: i, poster: t.poster, worker: t.worker, reward: t.reward,
+              deadline: t.deadline, submittedAt: t.submittedAt, status: Number(t.status),
+              title: t.title, description: t.description, proof: t.proof,
+            });
+          }
+          tasksCache = list.reverse();
+          renderTasks();
+          renderBoard();
+          return;
+        }
+      } catch (e2) { /* fall through to the error message */ }
       $("tasks").innerHTML = '<span class="muted">Could not load tasks: ' + esc(e.message || e) + "</span>";
     }
   }
@@ -234,7 +282,7 @@
             chainId: "0x" + cfg.chainId.toString(16),
             chainName: cfg.chainName,
             nativeCurrency: { name: "BNB", symbol: "BNB", decimals: 18 },
-            rpcUrls: [cfg.rpcUrl],
+            rpcUrls: [(cfg.rpcUrls && cfg.rpcUrls[0]) || cfg.rpcUrl],
             blockExplorerUrls: [cfg.explorer],
           }],
         });
@@ -266,20 +314,22 @@
       $("board").innerHTML = '<span class="muted">—</span>';
       return;
     }
-    initRead();
-    $("connectBtn").onclick = connect;
-    $("postBtn").onclick = postTask;
-    $("tasks").addEventListener("click", onAction);
-    $("tabs").addEventListener("click", (e) => {
-      const b = e.target.closest("[data-f]");
-      if (!b) return;
-      filter = b.dataset.f;
-      document.querySelectorAll("#tabs button").forEach((x) => x.classList.remove("active"));
-      b.classList.add("active");
-      renderTasks();
+    initRead().then((ok) => {
+      if (!ok) return;
+      $("connectBtn").onclick = connect;
+      $("postBtn").onclick = postTask;
+      $("tasks").addEventListener("click", onAction);
+      $("tabs").addEventListener("click", (e) => {
+        const b = e.target.closest("[data-f]");
+        if (!b) return;
+        filter = b.dataset.f;
+        document.querySelectorAll("#tabs button").forEach((x) => x.classList.remove("active"));
+        b.classList.add("active");
+        renderTasks();
+      });
+      loadTasks();
+      setInterval(loadTasks, 30000); // refresh every 30s
+      log("Loaded board " + cfg.agentBoard + " on " + cfg.chainName);
     });
-    loadTasks();
-    setInterval(loadTasks, 30000); // refresh every 30s
-    log("Loaded board " + cfg.agentBoard + " on " + cfg.chainName);
   });
 })();
